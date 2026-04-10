@@ -46,3 +46,25 @@ class RunState:
             "pending"   : self.pending,
             "artifacts" : self.artifacts
         }
+    
+    # Ajouter à la fin de models.py
+
+class Artifact:
+    """Represente un fichier produit par un agent."""
+    def __init__(self, name: str, path: str,
+                 produced_by: str, artifact_type: str):
+        self.name          = name
+        self.path          = path
+        self.produced_by   = produced_by
+        self.artifact_type = artifact_type
+
+class ToolCall:
+    """Represente un appel d'outil MCP."""
+    def __init__(self, agent: str, tool: str,
+                 params: dict, run_id: str):
+        self.agent  = agent
+        self.tool   = tool
+        self.params = params
+        self.run_id = run_id
+        self.result = None
+        self.success = False
