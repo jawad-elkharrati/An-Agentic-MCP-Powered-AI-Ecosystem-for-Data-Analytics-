@@ -1,113 +1,90 @@
-
-from fastapi  import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from app.mcp.auth     import is_authorized, get_permissions
+from app.mcp.registry import get_tool_module, list_tools
+from app.mcp.schemas  import TOOL_SCHEMAS
+from app.storage.artifact_store import ArtifactStore
+from app.orchestrator.models    import ToolCall
 import importlib
-from app.tools.log_artifact import log_artifact
 
-app = FastAPI(title="MCP Server")
+app   = FastAPI(title="MCP Server — KPI Monitoring")
+store = ArtifactStore()
 
-# Outils qui retournent (df, result) au lieu d'un dict
-# A garder pour compatibilite si load_dataset est appele directement
+# Seul load_dataset retourne (df, result) — les autres retournent dict
 TUPLE_TOOLS = {"load_dataset"}
 
-# ── Permissions ──
-PERMISSIONS = {
-    "data_engineer"  : ["load_dataset", "profile_data",
-                        "clean_data", "log_artifact"],
-    "data_scientist" : ["run_analysis", "log_artifact"],
-    "bi_agent"       : ["generate_chart", "publish_dashboard",
-                        "log_artifact"],
-    "reporter"       : ["compile_report", "log_artifact"],
-    "orchestrator"   : ["*"],
-}
-
-# ── Registre des outils ──
-TOOL_MODULES = {
-    "load_dataset"      : "app.tools.load_dataset",
-    "profile_data"      : "app.tools.profile_data",
-    "clean_data"        : "app.tools.clean_data",
-    "run_analysis"      : "app.tools.run_analysis",
-    "generate_chart"    : "app.tools.generate_chart",
-    "publish_dashboard" : "app.tools.publish_dashboard",
-    "log_artifact"      : "app.tools.log_artifact",
-    "compile_report"    : "app.tools.compile_report",
-}
 
 class ToolRequest(BaseModel):
-    agent  : str
-    tool   : str
-    params : dict
-    run_id : str
+    agent:  str
+    tool:   str
+    params: dict
+    run_id: str = ""
 
-def is_authorized(agent: str, tool: str) -> bool:
-    """Verifie si l'agent a le droit d'appeler cet outil."""
-    perms = PERMISSIONS.get(agent, [])
-    return "*" in perms or tool in perms
 
 @app.post("/call")
 def call_tool(req: ToolRequest):
-    """
-    Endpoint principal du MCP Server.
-    Recoit tous les appels d'outils des agents.
-    Etapes : 1.Permission 2.Registry 3.Execution 4.Log
-    """
-    print(f"[MCP] {req.agent} → {req.tool} (run: {req.run_id})")
 
-    # 1. Verifier permission
+    # 1. Permission
     if not is_authorized(req.agent, req.tool):
-        print(f"[MCP] PERMISSION REFUSEE : {req.agent} / {req.tool}")
-        raise HTTPException(
-            status_code = 403,
-            detail      = f"Agent '{req.agent}' non autorise "
-                          f"pour l'outil '{req.tool}'"
-        )
+        raise HTTPException(403, f"'{req.agent}' ne peut pas appeler '{req.tool}'")
 
-    # 2. Trouver le module dans le registre
-    module_path = TOOL_MODULES.get(req.tool)
+    # 2. Outil existe ?
+    module_path = get_tool_module(req.tool)
     if not module_path:
-        raise HTTPException(
-            status_code = 404,
-            detail      = f"Outil '{req.tool}' non trouve"
-        )
+        raise HTTPException(404, f"Outil '{req.tool}' introuvable")
 
-    # 3. Executer l'outil
+    # 3. Exécuter
     try:
         module = importlib.import_module(module_path)
         func   = getattr(module, req.tool)
         raw    = func(**req.params)
 
-        # Gerer les outils qui retournent encore un tuple (df, result)
-        if req.tool in TUPLE_TOOLS and isinstance(raw, tuple):
-            _, result = raw
-        else:
-            result = raw
-
-        # 4. Logger l'appel dans tool_calls.jsonl
-        log_artifact(req.run_id, f"mcp_{req.tool}", {
-            "agent"  : req.agent,
-            "tool"   : req.tool,
-            "status" : "success"
-        })
-
-        print(f"[MCP] {req.tool} termine avec succes")
-        return {"result": result}
-
+        # load_dataset retourne (df, result) — on prend seulement result
+        result  = raw[1] if req.tool in TUPLE_TOOLS else raw
+        success = True
+        error   = ""
     except Exception as e:
-        print(f"[MCP] ERREUR dans {req.tool} : {e}")
-        log_artifact(req.run_id, f"mcp_error_{req.tool}", {
-            "agent" : req.agent,
-            "tool"  : req.tool,
-            "error" : str(e)
-        })
-        raise HTTPException(status_code=500, detail=str(e))
+        result  = {}
+        success = False
+        error   = str(e)
+
+    # 4. Logger
+    if req.run_id:
+        store.log_tool_call(req.run_id, ToolCall(
+            agent_name = req.agent,
+            tool_name  = req.tool,
+            input      = req.params,
+            output     = result if isinstance(result, dict) else {},
+            success    = success,
+            error      = error
+        ))
+
+    if not success:
+        raise HTTPException(500, error)
+
+    return {"result": result}
+
+
+@app.get("/tools")
+def get_tools():
+    return {"tools": list_tools()}
+
+@app.get("/tools/schemas")
+def get_schemas():
+    return {"schemas": TOOL_SCHEMAS}
+
+@app.get("/permissions/{agent}")
+def agent_permissions(agent: str):
+    return {"agent": agent, "tools": get_permissions(agent)}
+
+@app.get("/logs/{run_id}")
+def get_logs(run_id: str):
+    return {"logs": store.get_logs(run_id)}
+
+@app.get("/status/{run_id}")
+def get_status(run_id: str):
+    return store.get_metadata(run_id)
 
 @app.get("/health")
 def health():
-    """Verifie que le serveur MCP tourne."""
-    return {
-        "status" : "ok",
-        "tools"  : list(TOOL_MODULES.keys()),
-        "agents" : list(PERMISSIONS.keys())
-
-    }
-
+    return {"status": "ok", "service": "MCP Server"}
