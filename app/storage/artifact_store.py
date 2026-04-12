@@ -26,12 +26,23 @@ class ArtifactStore:
         with open(path, "w") as f:
             json.dump(artifacts, f, indent=2)
 
-    def log_tool_call(self, run_id: str, call: ToolCall):
-        path = f"{self.base_dir}/{run_id}/tool_calls.jsonl"
-        with open(path, "a") as f:
-            entry = call.dict()
-            entry["timestamp"] = datetime.now().isoformat()
+     def log_tool_call(self, run_id: str, call):
+     path = f"{self.base_dir}/{run_id}/tool_calls.jsonl"
+     os.makedirs(os.path.dirname(path), exist_ok=True)
+     with open(path, "a") as f:
+        try:
+            entry = {
+                "timestamp":  call.timestamp or datetime.now().isoformat(),
+                "agent_name": call.agent_name,
+                "tool_name":  call.tool_name,
+                "input":      call.input,
+                "output":     call.output if isinstance(call.output, dict) else {},
+                "success":    call.success,
+                "error":      call.error
+            }
             f.write(json.dumps(entry) + "\n")
+        except Exception as e:
+            f.write(json.dumps({"error": str(e)}) + "\n")
 
     def log_decision(self, run_id: str, agent: str, decision: str, reason: str):
         path = f"{self.base_dir}/{run_id}/decisions.jsonl"
