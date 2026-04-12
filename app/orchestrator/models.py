@@ -60,13 +60,24 @@ class Artifact:
 
 class ToolCall:
     """Represente un appel d'outil MCP."""
-    def __init__(self, agent: str, tool: str,
-                 params: dict, run_id: str):
-        self.agent  = agent
-        self.tool   = tool
-        self.params = params
-        self.run_id = run_id
-        self.result = None
-        self.success = False
-
-        self.success = False
+    def __init__(self, agent_name: str, tool_name: str,
+                 input: dict, output: dict,
+                 success: bool, error: str = "", timestamp: str = ""):
+        self.agent_name = agent_name
+        self.tool_name  = tool_name
+        self.input      = input
+        self.output     = output
+        self.success    = success
+        self.error      = error
+        self.timestamp  = timestamp
+    
+    def dict(self):
+        return {
+            "agent_name": self.agent_name,
+            "tool_name":  self.tool_name,
+            "input":      self.input,
+            "output":     self.output,
+            "success":    self.success,
+            "error":      self.error,
+            "timestamp":  self.timestamp
+        }
