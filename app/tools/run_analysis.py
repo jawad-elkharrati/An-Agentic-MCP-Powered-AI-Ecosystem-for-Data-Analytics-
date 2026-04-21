@@ -8,20 +8,17 @@ SEUILS = {
 }
 
 def run_analysis(file_path: str, run_id: str) -> dict:
-    """
-    Analyse le dataset e-commerce et calcule les KPIs.
-    Détecte les alertes selon les seuils et produit des insights.
-    Retourne un dictionnaire complet avec kpis, alertes, insights et output_path.
-    """
     if not os.path.exists(file_path):
         return {"error": f"Fichier introuvable : {file_path}"}
 
     try:
         df = pd.read_csv(file_path, low_memory=False)
 
-        # ── Création colonne Revenue si nécessaire ─────────
+        # ── Création colonne Sales si nécessaire ──────────
         if "Sales" not in df.columns:
-            if "Quantity" in df.columns and "UnitPrice" in df.columns:
+            if "Quantity" in df.columns and "Price" in df.columns:
+                df["Sales"] = df["Quantity"] * df["Price"]
+            elif "Quantity" in df.columns and "UnitPrice" in df.columns:
                 df["Sales"] = df["Quantity"] * df["UnitPrice"]
             else:
                 df["Sales"] = 0.0
@@ -29,7 +26,7 @@ def run_analysis(file_path: str, run_id: str) -> dict:
         kpis = {}
 
         # ── CA total et moyen ─────────────────────────────
-        kpis["CA_total"]      = round(float(df["Revenue"].sum()), 2)
+        kpis["CA_total"]      = round(float(df["Sales"].sum()), 2)   # ← Revenue → Sales
         kpis["revenue_moyen"] = round(float(df["Sales"].mean()), 2)
 
         # ── CA par mois ───────────────────────────────────
@@ -51,18 +48,31 @@ def run_analysis(file_path: str, run_id: str) -> dict:
             kpis["CA_par_pays_top10"] = ca_pays.to_dict()
 
         # ── Clients ───────────────────────────────────────
-        if "CustomerID" in df.columns:
+        if "Customer ID" in df.columns:
+            kpis["nb_clients_uniques"] = int(df["Customer ID"].nunique())
+        elif "CustomerID" in df.columns:
             kpis["nb_clients_uniques"] = int(df["CustomerID"].nunique())
 
-        # ── Commandes et panier moyen ────────────────────
-        if "InvoiceNo" in df.columns:
-            total_commandes      = df["InvoiceNo"].nunique()
+        # ── Commandes et panier moyen ─────────────────────
+        if "Invoice" in df.columns:
+            col_invoice          = "Invoice"
+        elif "InvoiceNo" in df.columns:
+            col_invoice          = "InvoiceNo"
+        else:
+            col_invoice          = None
+
+        if col_invoice:
+            total_commandes      = df[col_invoice].nunique()
             kpis["nb_commandes"] = total_commandes
             if total_commandes > 0:
-                panier_moyen         = df.groupby("InvoiceNo")["Sales"].sum().mean()
+                panier_moyen         = df.groupby(col_invoice)["Sales"].sum().mean()
                 kpis["panier_moyen"] = round(float(panier_moyen), 2)
 
-        # ── Top produits par revenue ──────────────────────
+            # ── Taux annulation ───────────────────────────
+            cancel_inv              = df[col_invoice].astype(str).str.startswith("C").sum()
+            kpis["taux_annulation"] = round(cancel_inv / max(total_commandes, 1), 4)
+
+        # ── Top produits par Sales ────────────────────────
         if "Description" in df.columns:
             top_produits = (
                 df.groupby("Description")["Sales"]
@@ -73,15 +83,9 @@ def run_analysis(file_path: str, run_id: str) -> dict:
             )
             kpis["top_10_produits"] = top_produits.to_dict()
 
-        # ── Taux annulation ───────────────────────────────
-        if "InvoiceNo" in df.columns:
-            total_inv             = df["InvoiceNo"].nunique()
-            cancel_inv            = df["InvoiceNo"].astype(str).str.startswith("C").sum()
-            kpis["taux_annulation"] = round(cancel_inv / max(total_inv, 1), 4)
-
         # ── Data Quality Score ────────────────────────────
         dq_score                   = df.notna().mean().mean()
-        kpis["data_quality_score"] = round(dq_score, 2)
+        kpis["data_quality_score"] = round(float(dq_score), 2)
 
         # ── Alertes ───────────────────────────────────────
         alertes = []
@@ -123,24 +127,20 @@ def run_analysis(file_path: str, run_id: str) -> dict:
         # ── Sauvegarder le fichier insights ───────────────
         output_path = f"runs/{run_id}/artifacts/insights.json"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "w") as f:
-            json.dump(
-                {
-                    "kpis":        kpis,
-                    "alertes":     alertes,
-                    "insights":    insights,
-                    "output_path": output_path
-                },
-                f,
-                indent=2
-            )
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "kpis":        kpis,
+                "alertes":     alertes,
+                "insights":    insights,
+                "output_path": output_path
+            }, f, indent=2, ensure_ascii=False)
 
         return {
-            "output_path": output_path,
-            "kpis":        kpis,
-            "alertes":     alertes,
-            "insights":    insights,
-            "nb_alertes":  len(alertes),
+            "output_path" : output_path,
+            "kpis"        : kpis,
+            "alertes"     : alertes,
+            "insights"    : insights,
+            "nb_alertes"  : len(alertes),
         }
 
     except Exception as e:
