@@ -1,0 +1,70 @@
+{
+  "kpis": {
+    "CA_total": 20972594.55,
+    "revenue_moyen": 20.13,
+    "CA_par_mois": {
+      "2009-12": 825685.76,
+      "2010-01": 652708.5,
+      "2010-02": 553339.73,
+      "2010-03": 833570.13,
+      "2010-04": 681528.99,
+      "2010-05": 659858.86,
+      "2010-06": 752270.14,
+      "2010-07": 650712.94,
+      "2010-08": 697274.91,
+      "2010-09": 924333.01,
+      "2010-10": 1165483.91,
+      "2010-11": 1470272.48,
+      "2010-12": 1262598.79,
+      "2011-01": 691364.56,
+      "2011-02": 523631.89,
+      "2011-03": 717639.36,
+      "2011-04": 537808.62,
+      "2011-05": 770536.02,
+      "2011-06": 761739.9,
+      "2011-07": 719221.19,
+      "2011-08": 759138.38,
+      "2011-09": 1058590.17,
+      "2011-10": 1154979.3,
+      "2011-11": 1509496.33,
+      "2011-12": 638810.68
+    },
+    "CA_par_pays_top10": {
+      "United Kingdom": 17870977.76,
+      "EIRE": 664431.78,
+      "Netherlands": 554232.34,
+      "Germany": 431262.46,
+      "France": 356944.6,
+      "Australia": 169968.11,
+      "Spain": 109178.53,
+      "Switzerland": 101011.29,
+      "Sweden": 91903.72,
+      "Denmark": 69862.19
+    },
+    "nb_clients_uniques": 5879,
+    "nb_commandes": 40077,
+    "panier_moyen": 523.31,
+    "taux_annulation": 0.0,
+    "top_10_produits": {
+      "REGENCY CAKESTAND 3 TIER": 344563.25,
+      "Manual": 340731.33,
+      "DOTCOM POSTAGE": 322657.48,
+      "WHITE HANGING HEART T-LIGHT HOLDER": 266923.55,
+      "PAPER CRAFT , LITTLE BIRDIE": 168469.6,
+      "JUMBO BAG RED RETROSPOT": 150935.56,
+      "PARTY BUNTING": 149187.05,
+      "ASSORTED COLOUR BIRD ORNAMENT": 132187.92,
+      "POSTAGE": 127597.42,
+      "PAPER CHAIN KIT 50'S CHRISTMAS ": 123141.54
+    },
+    "data_quality_score": 1.0
+  },
+  "alertes": [],
+  "insights": [
+    "CA total : £20,972,595",
+    "Nombre de clients uniques : 5,879",
+    "Panier moyen par commande : £523.31",
+    "Premier pays par CA : United Kingdom"
+  ],
+  "output_path": "runs/test_run_001/artifacts/insights.json"
+}
