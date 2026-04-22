@@ -11,7 +11,7 @@ def main():
 
     RUN_ID = "test_run_001"
 
-    FILE_PATH = "runs/test_run_001/artifacts/clean.csv"
+    FILE_PATH = "runs/test_run_001/artifacts/clean.csv" // hna khaskom dero path deyalkom ana kan 3endi test_run_001 howa li fih resultat
 
     print("\n=================================================")
     print("   TEST — DataScientistAgent")
